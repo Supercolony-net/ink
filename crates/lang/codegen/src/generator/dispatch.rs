@@ -165,7 +165,7 @@ impl Dispatch<'_> {
                 let span = message.span();
                 message_spans.push(span);
 
-                if let Some(trait_path) = trait_path {
+               if let Some(trait_path) = trait_path {
                     let local_id = message.local_id().hex_padded_suffixed();
                     quote_spanned!(span=>
                         {
@@ -294,6 +294,7 @@ impl Dispatch<'_> {
                 let message_span = message.span();
                 let message_ident = message.ident();
                 let payable = message.is_payable();
+                let allow_reentry = message.allow_reentry();
                 let mutates = message.receiver().is_ref_mut();
                 let selector_id = message.composed_selector().into_be_u32().hex_padded_suffixed();
                 let selector_bytes = message.composed_selector().hex_lits();
@@ -316,6 +317,7 @@ impl Dispatch<'_> {
                             };
                         const SELECTOR: [::core::primitive::u8; 4usize] = [ #( #selector_bytes ),* ];
                         const PAYABLE: ::core::primitive::bool = #payable;
+                        const ALLOW_REENTRY: ::core::primitives::bool = #allow_reentry;
                         const MUTATES: ::core::primitive::bool = #mutates;
                         const LABEL: &'static ::core::primitive::str = ::core::stringify!(#message_ident);
                     }
@@ -346,6 +348,11 @@ impl Dispatch<'_> {
                         as #trait_path>::__ink_TraitInfo
                         as ::ink_lang::reflect::TraitMessageInfo<#local_id>>::PAYABLE
                 }};
+                let allow_reentry = quote! {{
+                    <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
+                        as #trait_path>::__ink_TraitInfo
+                        as ::ink_lang::reflect::TraitMessageInfo<#local_id>>::ALLOW_REENTRY
+                }};
                 let selector = quote! {{
                     <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
                         as #trait_path>::__ink_TraitInfo
@@ -374,6 +381,7 @@ impl Dispatch<'_> {
                             };
                         const SELECTOR: [::core::primitive::u8; 4usize] = #selector;
                         const PAYABLE: ::core::primitive::bool = #payable;
+                        const ALLOW_REENTRY: ::core::primitives::bool = #allow_reentry;
                         const MUTATES: ::core::primitive::bool = #mutates;
                         const LABEL: &'static ::core::primitive::str = #label;
                     }
@@ -427,6 +435,11 @@ impl Dispatch<'_> {
             #[allow(clippy::nonminimal_bool)]
             fn call() {
                 if !#any_message_accept_payment {
+                    ::ink_lang::codegen::deny_payment::<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>()
+                        .unwrap_or_else(|error| ::core::panic!("{}", error))
+                }
+
+                if !#allow_reentry {
                     ::ink_lang::codegen::deny_payment::<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>()
                         .unwrap_or_else(|error| ::core::panic!("{}", error))
                 }

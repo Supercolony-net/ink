@@ -381,6 +381,13 @@ mod sys {
             value_len: u32,
         ) -> ReturnCode;
     }
+
+    #[link(wasm_import_module = "__unstable__")]
+    extern "C" {
+        pub fn seal_reentrant_count() -> u32;
+
+        pub fn seal_account_entrance_count(account_ptr: Ptr32<[u8]>) -> u32;
+    }
 }
 
 fn extract_from_slice(output: &mut &mut [u8], new_len: usize) {
@@ -751,4 +758,18 @@ pub fn own_code_hash(output: &mut [u8]) {
             Ptr32Mut::from_ref(&mut output_len),
         )
     }
+}
+
+pub fn reentrant_count() -> u32 {
+    let ret_val = unsafe { sys::seal_reentrant_count() };
+    ret_val.into()
+}
+
+pub fn account_entrance_count(account_id: &[u8]) -> u32 {
+    let ret_val = unsafe {
+        sys::seal_account_entrance_count(
+            Ptr32::from_slice(account_id),
+        )
+    };
+    ret_val.into()
 }

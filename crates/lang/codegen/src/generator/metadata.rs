@@ -204,6 +204,7 @@ impl Metadata<'_> {
                     .filter_map(|attr| attr.extract_docs());
                 let selector_bytes = message.composed_selector().hex_lits();
                 let is_payable = message.is_payable();
+                let allow_reentry = message.allow_reentry();
                 let message = message.callable();
                 let mutates = message.receiver().is_ref_mut();
                 let ident = message.ident();
@@ -220,6 +221,7 @@ impl Metadata<'_> {
                         .returns(#ret_ty)
                         .mutates(#mutates)
                         .payable(#is_payable)
+                        .allow_reentry(#allow_reentry)
                         .docs([
                             #( #docs ),*
                         ])
@@ -263,6 +265,11 @@ impl Metadata<'_> {
                         as #trait_path>::__ink_TraitInfo
                         as ::ink_lang::reflect::TraitMessageInfo<#local_id>>::PAYABLE
                 }};
+                let allow_reentry = quote! {{
+                    <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
+                        as #trait_path>::__ink_TraitInfo
+                        as ::ink_lang::reflect::TraitMessageInfo<#local_id>>::ALLOW_REENTRY
+                }};
                 let selector = quote! {{
                     <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
                         as #trait_path>::__ink_TraitInfo
@@ -279,6 +286,7 @@ impl Metadata<'_> {
                         .returns(#ret_ty)
                         .mutates(#mutates)
                         .payable(#is_payable)
+                        .allow_reentry(#allow_reentry)
                         .docs([
                             #( #message_docs ),*
                         ])

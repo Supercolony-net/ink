@@ -68,10 +68,10 @@ impl GenerateCode for ItemImpls<'_> {
 impl ItemImpls<'_> {
     /// Generates code to guard annotated ink! trait message properties.
     ///
-    /// These guarded properties include `selector` and `payable`.
-    /// If an ink! trait message is annotated with `#[ink(payable)]`
+    /// These guarded properties include `selector`, `payable` and `allow_reentry`.
+    /// If an ink! trait message is annotated with `#[ink(payable)]`, `#[ink(allow_reentry)]`
     /// or `#[ink(selector = ..)]` then code is generated to guard that
-    /// the given argument to `payable` or `selector` is equal to
+    /// the given argument to `payable`, `allow_reentry` or `selector` is equal to
     /// what the associated ink! trait definition defines for the same
     /// ink! message.
     fn generate_trait_message_property_guards(&self) -> TokenStream2 {
@@ -97,6 +97,15 @@ impl ItemImpls<'_> {
                         }> = ::ink_lang::codegen::TraitMessagePayable::<true>;
                     )
                 });
+                let message_guard_allow_reentry = message.allow_reentry().then(|| {
+                    quote_spanned!(message_span=>
+                        const _: ::ink_lang::codegen::TraitMessagePayable<{
+                            <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
+                                as #trait_path>::__ink_TraitInfo
+                                as ::ink_lang::reflect::TraitMessageInfo<#message_local_id>>::ALLOW_REENTRY
+                        }> = ::ink_lang::codegen::TraitMessageAllowReentry::<true>;
+                    )
+                });
                 let message_guard_selector = message.user_provided_selector().map(|selector| {
                     let given_selector = selector.into_be_u32().hex_padded_suffixed();
                     quote_spanned!(message_span=>
@@ -111,6 +120,7 @@ impl ItemImpls<'_> {
                 });
                 quote_spanned!(message_span=>
                     #message_guard_payable
+                    #message_guard_allow_reentry
                     #message_guard_selector
                 )
             });

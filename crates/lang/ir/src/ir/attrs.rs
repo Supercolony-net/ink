@@ -279,6 +279,12 @@ impl InkAttribute {
             .any(|arg| matches!(arg.kind(), AttributeArg::Payable))
     }
 
+    /// Returns `true` if the ink! attribute contains the `allow_reentry` argument.
+    pub fn allow_reentry(&self) -> bool {
+        self.args()
+            .any(|arg| matches!(arg.kind(), AttributeArg::AllowReentry))
+    }
+
     /// Returns `true` if the ink! attribute contains the wildcard selector.
     pub fn has_wildcard_selector(&self) -> bool {
         self.args().any(|arg| {
@@ -405,6 +411,10 @@ pub enum AttributeArg {
     /// Applied on ink! constructors or messages in order to specify that they
     /// can receive funds from callers.
     Payable,
+    /// `#[ink(allow_reentry)]`
+    ///
+    /// Applied on ink! messages in order to specify that they allow reentrancy.
+    AllowReentry,
     /// Can be either one of:
     ///
     /// - `#[ink(selector = 0xDEADBEEF)]`
