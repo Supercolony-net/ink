@@ -105,12 +105,12 @@ where
             // Constructor is fallible and failed.
             //
             // We need to revert the state of the transaction.
-            ink_env::return_value::<
+            Ok(ink_env::return_value::<
                 <private::Seal<R> as ConstructorReturnType<Contract>>::ReturnValue,
             >(
                 ReturnFlags::default().set_reverted(true),
                 result.return_value(),
-            )
+            ))
         }
     }
 }
