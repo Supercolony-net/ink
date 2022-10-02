@@ -27,6 +27,8 @@ use ink_engine::test_api::RecordedDebugMessages;
 use std::panic::UnwindSafe;
 
 pub use super::call_data::CallData;
+use crate::contract::Entrypoint;
+use ink_engine::ext::Contract;
 pub use ink_engine::ChainExtension;
 
 /// Record for an emitted event.
@@ -94,6 +96,7 @@ where
         instance
             .engine
             .chain_extension_handler
+            .borrow_mut()
             .register(Box::new(extension));
     })
 }
@@ -354,4 +357,16 @@ pub fn assert_contract_termination<T, F>(
             .expect("input can not be decoded");
     assert_eq!(value_transferred, expected_value_transferred_to_beneficiary);
     assert_eq!(beneficiary, expected_beneficiary);
+}
+
+/// Registers the contract by the code hash. After registration, the contract can be instantiated.
+pub fn register_contract<C>(code_hash: &[u8]) -> Option<Contract>
+where
+    C: Entrypoint + ?Sized,
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        let deploy = C::deploy;
+        let call = C::call;
+        instance.engine.register_contract(code_hash, deploy, call)
+    })
 }

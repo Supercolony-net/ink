@@ -12,31 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod ext;
-pub mod test_api;
+//! Contract's stuff related to the environment.
 
-mod chain_extension;
-mod database;
-pub mod exec_context;
-mod hashing;
-mod types;
+/// Entrypoint of the contract to execute constructors or messages.
+pub trait Entrypoint {
+    /// Entrypoint to run a constructor for the contract. It deploys the contract to the environment.
+    fn deploy();
 
-#[cfg(test)]
-mod tests;
-
-pub use chain_extension::ChainExtension;
-pub use types::AccountError;
-
-use derive_more::From;
-
-/// Errors which can happen when interacting with this crate.
-#[derive(Debug, From, PartialEq, Eq)]
-pub enum Error {
-    Account(AccountError),
-    #[from(ignore)]
-    UninitializedBlocks,
-    #[from(ignore)]
-    UninitializedExecutionContext,
-    #[from(ignore)]
-    UnregisteredChainExtension,
+    /// Entrypoint to run a message of the contract.
+    fn call();
 }

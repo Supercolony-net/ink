@@ -46,6 +46,10 @@ pub struct ExecContext {
     pub block_timestamp: BlockTimestamp,
     /// The randomization entropy for a block.
     pub entropy: Hash,
+    /// The input of the call.
+    pub input: Vec<u8>,
+    /// The output buffer of the call.
+    pub output: Vec<u8>,
 }
 
 impl Default for ExecContext {
@@ -59,6 +63,8 @@ impl Default for ExecContext {
             block_number: 0,
             block_timestamp: 0,
             entropy,
+            input: vec![],
+            output: vec![],
         }
     }
 }

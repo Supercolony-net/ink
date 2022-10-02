@@ -36,7 +36,12 @@ use rand::{
     SeedableRng,
 };
 use scale::Encode;
-use std::panic::panic_any;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    panic::panic_any,
+    rc::Rc,
+};
 
 type Result = core::result::Result<(), Error>;
 
@@ -114,20 +119,34 @@ impl ReturnCode {
     }
 }
 
+#[derive(Default)]
+pub struct ContractStore {
+    pub instantiated: HashMap<Vec<u8>, Vec<u8>>,
+    pub deployed: HashMap<Vec<u8>, Contract>,
+}
+
+pub struct Contract {
+    pub deploy: fn(),
+    pub call: fn(),
+}
+
 /// The off-chain engine.
+#[derive(Clone)]
 pub struct Engine {
     /// The environment database.
-    pub database: Database,
+    pub database: Rc<RefCell<Database>>,
     /// The current execution context.
-    pub exec_context: ExecContext,
+    pub exec_context: Rc<RefCell<ExecContext>>,
     /// Recorder for relevant interactions with the engine.
     /// This is specifically about debug info. This info is
     /// not available in the `contracts` pallet.
-    pub(crate) debug_info: DebugInfo,
+    pub(crate) debug_info: Rc<RefCell<DebugInfo>>,
     /// The chain specification.
-    pub chain_spec: ChainSpec,
+    pub chain_spec: Rc<RefCell<ChainSpec>>,
     /// Handler for registered chain extensions.
-    pub chain_extension_handler: ChainExtensionHandler,
+    pub chain_extension_handler: Rc<RefCell<ChainExtensionHandler>>,
+    /// Contracts' store.
+    pub contracts: Rc<RefCell<ContractStore>>,
 }
 
 /// The chain specification.
@@ -162,11 +181,12 @@ impl Engine {
     // Creates a new `Engine instance.
     pub fn new() -> Self {
         Self {
-            database: Database::new(),
-            exec_context: ExecContext::new(),
-            debug_info: DebugInfo::new(),
-            chain_spec: ChainSpec::default(),
-            chain_extension_handler: ChainExtensionHandler::new(),
+            database: Rc::new(RefCell::new(Database::new())),
+            exec_context: Rc::new(RefCell::new(ExecContext::new())),
+            debug_info: Rc::new(RefCell::new(DebugInfo::new())),
+            chain_spec: Rc::new(RefCell::new(ChainSpec::default())),
+            chain_extension_handler: Rc::new(RefCell::new(ChainExtensionHandler::new())),
+            contracts: Rc::new(RefCell::new(Default::default())),
         }
     }
 }
@@ -194,8 +214,10 @@ impl Engine {
             .map_err(|_| Error::TransferFailed)?;
 
         self.database
+            .borrow_mut()
             .set_balance(&contract, contract_old_balance - increment);
         self.database
+            .borrow_mut()
             .set_balance(&dest, dest_old_balance + increment);
         Ok(())
     }
@@ -221,7 +243,7 @@ impl Engine {
             Vec::new()
         };
 
-        self.debug_info.record_event(EmittedEvent {
+        self.debug_info.borrow_mut().record_event(EmittedEvent {
             topics: topics_vec,
             data: data.to_vec(),
         });
@@ -232,12 +254,13 @@ impl Engine {
         let callee = self.get_callee();
         let account_id = AccountId::from_bytes(&callee[..]);
 
-        self.debug_info.inc_writes(account_id.clone());
+        self.debug_info.borrow_mut().inc_writes(account_id.clone());
         self.debug_info
+            .borrow_mut()
             .record_cell_for_account(account_id, key.to_vec());
 
         // We ignore if storage is already set for this key
-        let _ = self.database.insert_into_contract_storage(
+        let _ = self.database.borrow_mut().insert_into_contract_storage(
             &callee,
             key,
             encoded_value.to_vec(),
@@ -259,11 +282,13 @@ impl Engine {
         let callee = self.get_callee();
         let account_id = AccountId::from_bytes(&callee[..]);
 
-        self.debug_info.inc_writes(account_id.clone());
+        self.debug_info.borrow_mut().inc_writes(account_id.clone());
         self.debug_info
+            .borrow_mut()
             .record_cell_for_account(account_id, key.to_vec());
 
         self.database
+            .borrow_mut()
             .insert_into_contract_storage(&callee, key, encoded_value.to_vec())
             .map(|v| <u32>::try_from(v.len()).expect("usize to u32 conversion failed"))
     }
@@ -273,8 +298,12 @@ impl Engine {
         let callee = self.get_callee();
         let account_id = AccountId::from_bytes(&callee[..]);
 
-        self.debug_info.inc_reads(account_id);
-        match self.database.get_from_contract_storage(&callee, key) {
+        self.debug_info.borrow_mut().inc_reads(account_id);
+        match self
+            .database
+            .borrow()
+            .get_from_contract_storage(&callee, key)
+        {
             Some(val) => {
                 set_output(output, val);
                 Ok(())
@@ -288,8 +317,9 @@ impl Engine {
         let callee = self.get_callee();
         let account_id = AccountId::from_bytes(&callee[..]);
 
-        self.debug_info.inc_reads(account_id);
+        self.debug_info.borrow_mut().inc_reads(account_id);
         self.database
+            .borrow()
             .get_from_contract_storage(&callee, key)
             .map(|val| val.len() as u32)
     }
@@ -298,11 +328,15 @@ impl Engine {
     pub fn clear_storage(&mut self, key: &[u8; 32]) {
         let callee = self.get_callee();
         let account_id = AccountId::from_bytes(&callee[..]);
-        self.debug_info.inc_writes(account_id.clone());
+        self.debug_info.borrow_mut().inc_writes(account_id.clone());
         let _ = self
             .debug_info
+            .borrow_mut()
             .remove_cell_for_account(account_id, key.to_vec());
-        let _ = self.database.remove_contract_storage(&callee, key);
+        let _ = self
+            .database
+            .borrow_mut()
+            .remove_contract_storage(&callee, key);
     }
 
     /// Remove the calling account and transfer remaining balance.
@@ -329,23 +363,27 @@ impl Engine {
     pub fn caller(&self, output: &mut &mut [u8]) {
         let caller = self
             .exec_context
+            .borrow()
             .caller
             .as_ref()
             .expect("no caller has been set")
-            .as_bytes();
-        set_output(output, caller);
+            .clone();
+        set_output(output, caller.as_bytes());
     }
 
     /// Returns the balance of the executed contract.
     pub fn balance(&self, output: &mut &mut [u8]) {
         let contract = self
             .exec_context
+            .borrow()
             .callee
             .as_ref()
-            .expect("no callee has been set");
+            .expect("no callee has been set")
+            .clone();
 
         let balance_in_storage = self
             .database
+            .borrow()
             .get_balance(contract.as_bytes())
             .expect("currently executing contract must exist");
         let balance = scale::Encode::encode(&balance_in_storage);
@@ -355,7 +393,7 @@ impl Engine {
     /// Returns the transferred value for the called contract.
     pub fn value_transferred(&self, output: &mut &mut [u8]) {
         let value_transferred: Vec<u8> =
-            scale::Encode::encode(&self.exec_context.value_transferred);
+            scale::Encode::encode(&self.exec_context.borrow().value_transferred);
         set_output(output, &value_transferred[..])
     }
 
@@ -363,16 +401,19 @@ impl Engine {
     pub fn address(&self, output: &mut &mut [u8]) {
         let callee = self
             .exec_context
+            .borrow()
             .callee
             .as_ref()
             .expect("no callee has been set")
-            .as_bytes();
-        set_output(output, callee)
+            .clone();
+        set_output(output, callee.as_bytes())
     }
 
     /// Records the given debug message and appends to stdout.
     pub fn debug_message(&mut self, message: &str) {
-        self.debug_info.record_debug_message(String::from(message));
+        self.debug_info
+            .borrow_mut()
+            .record_debug_message(String::from(message));
         print!("{}", message);
     }
 
@@ -399,14 +440,14 @@ impl Engine {
     /// Returns the current block number.
     pub fn block_number(&self, output: &mut &mut [u8]) {
         let block_number: Vec<u8> =
-            scale::Encode::encode(&self.exec_context.block_number);
+            scale::Encode::encode(&self.exec_context.borrow().block_number);
         set_output(output, &block_number[..])
     }
 
     /// Returns the timestamp of the current block.
     pub fn block_timestamp(&self, output: &mut &mut [u8]) {
         let block_timestamp: Vec<u8> =
-            scale::Encode::encode(&self.exec_context.block_timestamp);
+            scale::Encode::encode(&self.exec_context.borrow().block_timestamp);
         set_output(output, &block_timestamp[..])
     }
 
@@ -418,7 +459,7 @@ impl Engine {
     /// (i.e. the chain's existential deposit).
     pub fn minimum_balance(&self, output: &mut &mut [u8]) {
         let minimum_balance: Vec<u8> =
-            scale::Encode::encode(&self.chain_spec.minimum_balance);
+            scale::Encode::encode(&self.chain_spec.borrow().minimum_balance);
         set_output(output, &minimum_balance[..])
     }
 
@@ -449,7 +490,11 @@ impl Engine {
 
     /// Emulates gas price calculation.
     pub fn weight_to_fee(&self, gas: u64, output: &mut &mut [u8]) {
-        let fee = self.chain_spec.gas_price.saturating_mul(gas.into());
+        let fee = self
+            .chain_spec
+            .borrow()
+            .gas_price
+            .saturating_mul(gas.into());
         let fee: Vec<u8> = scale::Encode::encode(&fee);
         set_output(output, &fee[..])
     }
@@ -472,7 +517,7 @@ impl Engine {
     ///    engine.random(&subject, &mut output.as_mut_slice());
     /// ```
     pub fn random(&self, subject: &[u8], output: &mut &mut [u8]) {
-        let seed = (self.exec_context.entropy, subject).encode();
+        let seed = (self.exec_context.borrow().entropy, subject).encode();
         let mut digest = [0u8; 32];
         Engine::hash_blake2_256(&seed, &mut digest);
 
@@ -489,9 +534,9 @@ impl Engine {
         input: &[u8],
         output: &mut &mut [u8],
     ) {
+        let mut chain_extension_handler = self.chain_extension_handler.borrow_mut();
         let encoded_input = input.encode();
-        let (status_code, out) = self
-            .chain_extension_handler
+        let (status_code, out) = chain_extension_handler
             .eval(func_id, &encoded_input)
             .unwrap_or_else(|error| {
                 panic!(
@@ -549,6 +594,19 @@ impl Engine {
             }
             Err(_) => Err(Error::EcdsaRecoveryFailed),
         }
+    }
+
+    /// Register the contract into the local storage.
+    pub fn register_contract(
+        &mut self,
+        hash: &[u8],
+        deploy: fn(),
+        call: fn(),
+    ) -> Option<Contract> {
+        self.contracts
+            .borrow_mut()
+            .deployed
+            .insert(hash.to_vec(), Contract { deploy, call })
     }
 }
 
