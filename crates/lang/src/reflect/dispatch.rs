@@ -257,6 +257,8 @@ pub trait DispatchableMessageInfo<const ID: u32> {
     const MUTATES: bool;
     /// Yields `true` if the dispatchable ink! message is payable.
     const PAYABLE: bool;
+    /// Yields `true` if the dispatchable ink! message is reentrant.
+    const ALLOW_REENTRANCY: bool;
     /// The selectors of the dispatchable ink! message.
     const SELECTOR: [u8; 4];
     /// The label of the dispatchable ink! message.
@@ -341,6 +343,9 @@ pub trait DispatchableConstructorInfo<const ID: u32> {
 
     /// Yields `true` if the dispatchable ink! constructor is payable.
     const PAYABLE: bool;
+
+    /// Yields `true` if the dispatchable ink! constructor is reentrant.
+    const ALLOW_REENTRANCY: bool;
 
     /// The selectors of the dispatchable ink! constructor.
     const SELECTOR: [u8; 4];

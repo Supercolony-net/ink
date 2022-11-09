@@ -253,6 +253,7 @@ impl Dispatch<'_> {
                 let constructor_span = constructor.span();
                 let constructor_ident = constructor.ident();
                 let payable = constructor.is_payable();
+                let allow_reentrancy = constructor.allow_reentrancy();
                 let selector_id = constructor.composed_selector().into_be_u32().hex_padded_suffixed();
                 let selector_bytes = constructor.composed_selector().hex_lits();
                 let input_bindings = generator::input_bindings(constructor.inputs());
@@ -267,6 +268,7 @@ impl Dispatch<'_> {
                             #storage_ident::#constructor_ident( #( #input_bindings ),* )
                         };
                         const PAYABLE: ::core::primitive::bool = #payable;
+                        const ALLOW_REENTRANCY: ::core::primitive::bool = #allow_reentrancy;
                         const SELECTOR: [::core::primitive::u8; 4usize] = [ #( #selector_bytes ),* ];
                         const LABEL: &'static ::core::primitive::str = ::core::stringify!(#constructor_ident);
                     }
@@ -294,6 +296,7 @@ impl Dispatch<'_> {
                 let message_span = message.span();
                 let message_ident = message.ident();
                 let payable = message.is_payable();
+                let allow_reentrancy = message.allow_reentrancy();
                 let mutates = message.receiver().is_ref_mut();
                 let selector_id = message.composed_selector().into_be_u32().hex_padded_suffixed();
                 let selector_bytes = message.composed_selector().hex_lits();
@@ -316,6 +319,7 @@ impl Dispatch<'_> {
                             };
                         const SELECTOR: [::core::primitive::u8; 4usize] = [ #( #selector_bytes ),* ];
                         const PAYABLE: ::core::primitive::bool = #payable;
+                        const ALLOW_REENTRANCY: ::core::primitive::bool = #allow_reentrancy;
                         const MUTATES: ::core::primitive::bool = #mutates;
                         const LABEL: &'static ::core::primitive::str = ::core::stringify!(#message_ident);
                     }
@@ -346,6 +350,11 @@ impl Dispatch<'_> {
                         as #trait_path>::__ink_TraitInfo
                         as ::ink_lang::reflect::TraitMessageInfo<#local_id>>::PAYABLE
                 }};
+                let allow_reentrancy = quote! {{
+                    <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
+                        as #trait_path>::__ink_TraitInfo
+                        as ::ink_lang::reflect::TraitMessageInfo<#local_id>>::ALLOW_REENTRANCY
+                }};
                 let selector = quote! {{
                     <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
                         as #trait_path>::__ink_TraitInfo
@@ -374,6 +383,7 @@ impl Dispatch<'_> {
                             };
                         const SELECTOR: [::core::primitive::u8; 4usize] = #selector;
                         const PAYABLE: ::core::primitive::bool = #payable;
+                        const ALLOW_REENTRANCY: ::core::primitive::bool = #allow_reentrancy;
                         const MUTATES: ::core::primitive::bool = #mutates;
                         const LABEL: &'static ::core::primitive::str = #label;
                     }

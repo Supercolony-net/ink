@@ -116,6 +116,10 @@ where
         <C as Callable>::is_payable(self.callable)
     }
 
+    fn allow_reentrancy(&self) -> bool {
+        <C as Callable>::allow_reentrancy(self.callable)
+    }
+
     fn has_wildcard_selector(&self) -> bool {
         <C as Callable>::has_wildcard_selector(self.callable)
     }
@@ -165,6 +169,13 @@ pub trait Callable {
     ///
     /// Flagging as payable is done using the `#[ink(payable)]` attribute.
     fn is_payable(&self) -> bool;
+
+    /// Returns `true` if the ink! callable is flagged as allowing reentrancy.
+    ///
+    /// # Note
+    ///
+    /// Flagging as allowing reentrancy is done using the `#[ink(allow_reentrancy)]` attribute.
+    fn allow_reentrancy(&self) -> bool;
 
     /// Returns `true` if the ink! callable is flagged as a wildcard selector.
     fn has_wildcard_selector(&self) -> bool;

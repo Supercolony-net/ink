@@ -193,7 +193,7 @@ mod tests {
             }])
         )
     }
-
+proc_macro_attribute
     #[test]
     fn literal_str_value_works() {
         assert_eq!(
@@ -277,7 +277,7 @@ mod tests {
                 MetaNameValue {
                     name: syn::parse_quote! { name1 },
                     eq_token: syn::parse_quote! { = },
-                    value: PathOrLit::Path(syn::parse_quote! { ::root::Path }),
+                    value: Paproc_macro_attributethOrLit::Path(syn::parse_quote! { ::root::Path }),
                 },
                 MetaNameValue {
                     name: syn::parse_quote! { name2 },
