@@ -60,7 +60,7 @@ pub struct CallFlags {
     forward_input: bool,
     clone_input: bool,
     tail_call: bool,
-    allow_reentry: bool,
+    deny_reentry: bool,
 }
 
 impl CallFlags {
@@ -107,8 +107,8 @@ impl CallFlags {
     /// Without this flag any reentrancy into the current contract that originates from
     /// the callee (or any of its callees) is denied. This includes the first callee:
     /// You cannot call into yourself with this flag set.
-    pub const fn set_allow_reentry(mut self, allow_reentry: bool) -> Self {
-        self.allow_reentry = allow_reentry;
+    pub const fn set_deny_reentry(mut self, deny_reentry: bool) -> Self {
+        self.deny_reentry = deny_reentry;
         self
     }
 
@@ -120,7 +120,7 @@ impl CallFlags {
         self.forward_input as u32
             | ((self.clone_input as u32) << 1)
             | ((self.tail_call as u32) << 2)
-            | ((self.allow_reentry as u32) << 3)
+            | ((self.deny_reentry as u32) << 3)
     }
 
     /// Returns `true` if input forwarding is set.
@@ -155,8 +155,8 @@ impl CallFlags {
     /// # Note
     ///
     /// See [`Self::set_allow_reentry`] for more information.
-    pub const fn allow_reentry(&self) -> bool {
-        self.allow_reentry
+    pub const fn deny_reentry(&self) -> bool {
+        self.deny_reentry
     }
 }
 
@@ -498,6 +498,10 @@ pub trait TypedEnvBackend: EnvBackend {
     ///
     /// For more details visit: [`own_code_hash`][`crate::own_code_hash`]
     fn own_code_hash<E>(&mut self) -> Result<E::Hash>
+    where
+        E: Environment;
+
+    fn reentrant_count<E>(&mut self) -> u32
     where
         E: Environment;
 }

@@ -64,6 +64,18 @@ where
     Ok(())
 }
 
+
+pub fn deny_reentrance<E>() -> Result<(), DispatchError>
+where
+    E: Environment,
+{
+    let reentrance = ink_env::reentrant_count();
+    if reentrance > 1 {
+        return Err(DispatchError::ReentranceNotAllowed)
+    }
+    Ok(())
+}
+
 /// Configuration for execution of ink! constructor.
 #[derive(Debug, Copy, Clone)]
 pub struct ExecuteConstructorConfig {

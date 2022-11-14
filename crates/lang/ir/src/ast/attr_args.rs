@@ -193,7 +193,6 @@ mod tests {
             }])
         )
     }
-proc_macro_attribute
     #[test]
     fn literal_str_value_works() {
         assert_eq!(

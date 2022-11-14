@@ -253,7 +253,6 @@ impl Dispatch<'_> {
                 let constructor_span = constructor.span();
                 let constructor_ident = constructor.ident();
                 let payable = constructor.is_payable();
-                let allow_reentrancy = constructor.allow_reentrancy();
                 let selector_id = constructor.composed_selector().into_be_u32().hex_padded_suffixed();
                 let selector_bytes = constructor.composed_selector().hex_lits();
                 let input_bindings = generator::input_bindings(constructor.inputs());
@@ -268,7 +267,6 @@ impl Dispatch<'_> {
                             #storage_ident::#constructor_ident( #( #input_bindings ),* )
                         };
                         const PAYABLE: ::core::primitive::bool = #payable;
-                        const ALLOW_REENTRANCY: ::core::primitive::bool = #allow_reentrancy;
                         const SELECTOR: [::core::primitive::u8; 4usize] = [ #( #selector_bytes ),* ];
                         const LABEL: &'static ::core::primitive::str = ::core::stringify!(#constructor_ident);
                     }
@@ -410,6 +408,8 @@ impl Dispatch<'_> {
             self.any_constructor_accepts_payment_expr(constructor_spans);
         let any_message_accept_payment =
             self.any_message_accepts_payment_expr(message_spans);
+        let any_message_accepts_reentrancy =
+            self.any_message_accepts_reentrancy(message_spans);
         quote_spanned!(span=>
             #[cfg(not(test))]
             #[no_mangle]
@@ -437,6 +437,10 @@ impl Dispatch<'_> {
             #[allow(clippy::nonminimal_bool)]
             fn call() {
                 if !#any_message_accept_payment {
+                    ::ink_lang::codegen::deny_payment::<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>()
+                        .unwrap_or_else(|error| ::core::panic!("{}", error))
+                }
+                if !#any_message_accepts_reentrancy {
                     ::ink_lang::codegen::deny_payment::<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>()
                         .unwrap_or_else(|error| ::core::panic!("{}", error))
                 }
@@ -727,6 +731,13 @@ impl Dispatch<'_> {
                     }>>::IDS[#index]
                 }>>::PAYABLE
             );
+            let deny_reentrancy = quote_spanned!(message_span=>
+                !<#storage_ident as ::ink_lang::reflect::DispatchableMessageInfo<{
+                    <#storage_ident as ::ink_lang::reflect::ContractDispatchableMessages<{
+                        <#storage_ident as ::ink_lang::reflect::ContractAmountDispatchables>::MESSAGES
+                    }>>::IDS[#index]
+                }>>::ALLOW_REENTRANCY
+            );
             let mutates_storage = quote_spanned!(message_span=>
                 <#storage_ident as ::ink_lang::reflect::DispatchableMessageInfo<{
                     <#storage_ident as ::ink_lang::reflect::ContractDispatchableMessages<{
@@ -741,6 +752,10 @@ impl Dispatch<'_> {
 
                     if #deny_payment {
                         ::ink_lang::codegen::deny_payment::<
+                            <#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>()?;
+                    }
+                    if #deny_reentrancy {
+                        ::ink_lang::codegen::deny_reentrancy::<
                             <#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>()?;
                     }
 
@@ -771,6 +786,7 @@ impl Dispatch<'_> {
 
         quote_spanned!(span=>
             const _: () = {
+                #[allow(non_camel_case_types)]
                 #[allow(non_camel_case_types)]
                 pub enum __ink_MessageDecoder {
                     #( #message_variants ),*
@@ -891,6 +907,30 @@ impl Dispatch<'_> {
         });
         quote_spanned!(span=>
             { false #( || #constructor_is_payable )* }
+        )
+    }
+
+    fn any_message_accepts_reentrancy(
+        &self,
+        message_spans: &[proc_macro2::Span]
+    ) -> TokenStream2 {
+        assert_eq!(message_spans.len(), self.query_amount_messages());
+
+        let span = self.contract.module().storage().span();
+        let storage_ident = self.contract.module().storage().ident();
+        let count_messages = self.query_amount_messages();
+        let message_is_reentrant = (0..count_messages).map(|index| {
+            let message_span = message_spans[index];
+            quote_spanned!(message_span=>
+                <#storage_ident as ::ink_lang::reflect::DispatchableMessageInfo<{
+                    <#storage_ident as ::ink_lang::reflect::ContractDispatchableMessages<{
+                        <#storage_ident as ::ink_lang::reflect::ContractAmountDispatchables>::MESSAGES
+                    }>>::IDS[#index]
+                }>>::ALLOW_REENTRANCY
+            )
+        });
+        quote_spanned!(span=>
+            { false #( || #message_is_reentrant )* }
         )
     }
 }

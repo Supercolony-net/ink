@@ -66,8 +66,6 @@ pub struct Constructor {
     pub(super) item: syn::ImplItemMethod,
     /// If the ink! constructor can receive funds.
     is_payable: bool,
-    /// If the ink! constructor can be reentrant.
-    allow_reentrancy: bool,
     /// An optional user provided selector.
     ///
     /// # Note
@@ -179,12 +177,10 @@ impl TryFrom<syn::ImplItemMethod> for Constructor {
         Self::ensure_no_self_receiver(&method_item)?;
         let (ink_attrs, other_attrs) = Self::sanitize_attributes(&method_item)?;
         let is_payable = ink_attrs.is_payable();
-        let allow_reentrancy = ink_attrs.allow_reentrancy();
         let selector = ink_attrs.selector();
         Ok(Constructor {
             selector,
             is_payable,
-            allow_reentrancy,
             item: syn::ImplItemMethod {
                 attrs: other_attrs,
                 ..method_item
@@ -218,10 +214,6 @@ impl Callable for Constructor {
 
     fn is_payable(&self) -> bool {
         self.is_payable
-    }
-
-    fn allow_reentrancy(&self) -> bool {
-        self.allow_reentrancy
     }
 
     fn visibility(&self) -> Visibility {
