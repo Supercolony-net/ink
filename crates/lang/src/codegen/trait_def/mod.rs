@@ -22,6 +22,7 @@ pub use self::{
         TraitCallForwarderFor,
     },
     trait_message::{
+        TraitMessageAllowReentrancy,
         TraitMessagePayable,
         TraitMessageSelector,
     },

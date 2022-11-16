@@ -276,7 +276,7 @@ mod tests {
                 MetaNameValue {
                     name: syn::parse_quote! { name1 },
                     eq_token: syn::parse_quote! { = },
-                    value: Paproc_macro_attributethOrLit::Path(syn::parse_quote! { ::root::Path }),
+                    value: PathOrLit::Path(syn::parse_quote! { ::root::Path }),
                 },
                 MetaNameValue {
                     name: syn::parse_quote! { name2 },

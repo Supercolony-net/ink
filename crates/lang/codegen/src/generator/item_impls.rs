@@ -99,11 +99,11 @@ impl ItemImpls<'_> {
                 });
                 let message_quard_reentrancy = message.allow_reentrancy().then(|| {
                     quote_spanned!(message_span=>
-                        const _: ::ink_lang::codegen::TraitMessageReentrancy<{
+                        const _: ::ink_lang::codegen::TraitMessageAllowReentrancy<{
                             <<::ink_lang::reflect::TraitDefinitionRegistry<<#storage_ident as ::ink_lang::reflect::ContractEnv>::Env>
                                 as #trait_path>::__ink_TraitInfo
                                 as ::ink_lang::reflect::TraitMessageInfo<#message_local_id>>::ALLOW_REENTRANCY
-                        }> = ::ink_lang::codegen::TraitMessageReentrancy::<true>;
+                        }> = ::ink_lang::codegen::TraitMessageAllowReentrancy::<true>;
                     )
                 });
                 let message_guard_selector = message.user_provided_selector().map(|selector| {

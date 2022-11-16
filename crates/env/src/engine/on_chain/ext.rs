@@ -388,6 +388,11 @@ mod sys {
             value_len: u32,
         ) -> ReturnCode;
     }
+
+    #[link(wasm_import_module = "__unstable__")]
+    extern "C" {
+        pub fn reentrant_count() -> u32;
+    }
 }
 
 fn extract_from_slice(output: &mut &mut [u8], new_len: usize) {
@@ -771,7 +776,5 @@ pub fn own_code_hash(output: &mut [u8]) {
 }
 
 pub fn reentrant_count() -> u32 {
-    unsafe {
-        sys::seal_reentrant_count()
-    }
+    unsafe { sys::reentrant_count() }
 }

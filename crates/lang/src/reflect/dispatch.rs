@@ -534,6 +534,8 @@ pub enum DispatchError {
     CouldNotReadInput,
     /// Invalidly paid an unpayable dispatchable.
     PaidUnpayableMessage,
+    /// Reentrancy occurred during dispatch.
+    ReentranceDenied,
 }
 
 impl Display for DispatchError {
@@ -552,6 +554,7 @@ impl DispatchError {
             Self::InvalidParameters => "unable to decode input",
             Self::CouldNotReadInput => "could not read input",
             Self::PaidUnpayableMessage => "paid an unpayable message",
+            Self::ReentranceDenied => "reentrance denied",
         }
     }
 }

@@ -90,7 +90,7 @@ pub struct ItemMod {
     vis: syn::Visibility,
     mod_token: token::Mod,
     ident: Ident,
-    brace: token::Brace,proc_macro_attribute
+    brace: token::Brace,
     items: Vec<ir::Item>,
 }
 

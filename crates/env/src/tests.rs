@@ -80,13 +80,13 @@ fn test_call_flags() {
     assert!(flags.tail_call());
     assert_eq!(flags.into_u32(), 0b0000_0111);
 
-    let flags = flags.set_allow_reentry(true);
-    assert!(flags.allow_reentry());
+    let flags = flags.set_deny_reentry(true);
+    assert!(flags.deny_reentry());
     assert_eq!(flags.into_u32(), 0b0000_1111);
 
     // disable each flag one after the other
-    let flags = flags.set_allow_reentry(false);
-    assert!(!flags.allow_reentry());
+    let flags = flags.set_deny_reentry(false);
+    assert!(!flags.deny_reentry());
     assert_eq!(flags.into_u32(), 0b0000_0111);
 
     let flags = flags.set_tail_call(false);

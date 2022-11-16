@@ -154,7 +154,7 @@ impl CallFlags {
     ///
     /// # Note
     ///
-    /// See [`Self::set_allow_reentry`] for more information.
+    /// See [`Self::set_deny_reentry`] for more information.
     pub const fn deny_reentry(&self) -> bool {
         self.deny_reentry
     }

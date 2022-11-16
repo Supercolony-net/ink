@@ -398,6 +398,8 @@ pub struct MessageSpec<F: Form = MetaForm> {
     mutates: bool,
     /// If the message accepts any `value` from the caller.
     payable: bool,
+    /// If reentrancy is allowed for the message.
+    allow_reentrancy: bool,
     /// The parameters of the message.
     args: Vec<MessageParamSpec<F>>,
     /// The return type of the message.
@@ -420,6 +422,8 @@ mod state {
     pub struct Mutates;
     /// Type state for telling if the message is payable.
     pub struct IsPayable;
+    /// Type state for telling if reentrancy for message is allowed.
+    pub struct AllowReentrancy;
     /// Type state for the message return type.
     pub struct Returns;
 }
@@ -432,6 +436,7 @@ impl MessageSpec {
         Missing<state::Selector>,
         Missing<state::Mutates>,
         Missing<state::IsPayable>,
+        Missing<state::AllowReentrancy>,
         Missing<state::Returns>,
     > {
         MessageSpecBuilder {
@@ -440,6 +445,7 @@ impl MessageSpec {
                 selector: Selector::default(),
                 mutates: false,
                 payable: false,
+                allow_reentrancy: false,
                 args: Vec::new(),
                 return_type: ReturnTypeSpec::new(None),
                 docs: Vec::new(),
@@ -476,6 +482,11 @@ where
         self.payable
     }
 
+    /// Returns true if reentrancy is allowed for the message.
+    pub fn allow_reentrancy(&self) -> bool {
+        self.allow_reentrancy
+    }
+
     /// Returns the parameters of the message.
     pub fn args(&self) -> &[MessageParamSpec<F>] {
         &self.args
@@ -501,17 +512,17 @@ where
 /// debug code-gen macros.
 #[allow(clippy::type_complexity)]
 #[must_use]
-pub struct MessageSpecBuilder<Selector, Mutates, IsPayable, Returns> {
+pub struct MessageSpecBuilder<Selector, Mutates, IsPayable, AllowReentrancy, Returns> {
     spec: MessageSpec,
-    marker: PhantomData<fn() -> (Selector, Mutates, IsPayable, Returns)>,
+    marker: PhantomData<fn() -> (Selector, Mutates, IsPayable, AllowReentrancy, Returns)>,
 }
 
-impl<M, P, R> MessageSpecBuilder<Missing<state::Selector>, M, P, R> {
+impl<M, P, AR, R> MessageSpecBuilder<Missing<state::Selector>, M, P, AR, R> {
     /// Sets the function selector of the message.
     pub fn selector(
         self,
         selector: [u8; 4],
-    ) -> MessageSpecBuilder<state::Selector, M, P, R> {
+    ) -> MessageSpecBuilder<state::Selector, M, P, AR, R> {
         MessageSpecBuilder {
             spec: MessageSpec {
                 selector: selector.into(),
@@ -522,9 +533,12 @@ impl<M, P, R> MessageSpecBuilder<Missing<state::Selector>, M, P, R> {
     }
 }
 
-impl<S, P, R> MessageSpecBuilder<S, Missing<state::Mutates>, P, R> {
+impl<S, P, AR, R> MessageSpecBuilder<S, Missing<state::Mutates>, P, AR, R> {
     /// Sets if the message is mutable, thus taking `&mut self` or not thus taking `&self`.
-    pub fn mutates(self, mutates: bool) -> MessageSpecBuilder<S, state::Mutates, P, R> {
+    pub fn mutates(
+        self,
+        mutates: bool,
+    ) -> MessageSpecBuilder<S, state::Mutates, P, AR, R> {
         MessageSpecBuilder {
             spec: MessageSpec {
                 mutates,
@@ -535,12 +549,12 @@ impl<S, P, R> MessageSpecBuilder<S, Missing<state::Mutates>, P, R> {
     }
 }
 
-impl<S, M, R> MessageSpecBuilder<S, M, Missing<state::IsPayable>, R> {
+impl<S, M, AR, R> MessageSpecBuilder<S, M, Missing<state::IsPayable>, AR, R> {
     /// Sets if the message is payable, thus accepting value for the caller.
     pub fn payable(
         self,
         is_payable: bool,
-    ) -> MessageSpecBuilder<S, M, state::IsPayable, R> {
+    ) -> MessageSpecBuilder<S, M, state::IsPayable, AR, R> {
         MessageSpecBuilder {
             spec: MessageSpec {
                 payable: is_payable,
@@ -551,12 +565,28 @@ impl<S, M, R> MessageSpecBuilder<S, M, Missing<state::IsPayable>, R> {
     }
 }
 
-impl<M, S, P> MessageSpecBuilder<S, M, P, Missing<state::Returns>> {
+impl<S, M, P, R> MessageSpecBuilder<S, M, P, Missing<state::AllowReentrancy>, R> {
+    /// Sets if reentrancy is allowed for the message.
+    pub fn allow_reentrancy(
+        self,
+        allow_reentrancy: bool,
+    ) -> MessageSpecBuilder<S, M, P, state::AllowReentrancy, R> {
+        MessageSpecBuilder {
+            spec: MessageSpec {
+                allow_reentrancy,
+                ..self.spec
+            },
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<M, S, P, AR> MessageSpecBuilder<S, M, P, AR, Missing<state::Returns>> {
     /// Sets the return type of the message.
     pub fn returns(
         self,
         return_type: ReturnTypeSpec,
-    ) -> MessageSpecBuilder<S, M, P, state::Returns> {
+    ) -> MessageSpecBuilder<S, M, P, AR, state::Returns> {
         MessageSpecBuilder {
             spec: MessageSpec {
                 return_type,
@@ -567,7 +597,7 @@ impl<M, S, P> MessageSpecBuilder<S, M, P, Missing<state::Returns>> {
     }
 }
 
-impl<S, M, P, R> MessageSpecBuilder<S, M, P, R> {
+impl<S, M, P, AR, R> MessageSpecBuilder<S, M, P, AR, R> {
     /// Sets the input arguments of the message specification.
     pub fn args<A>(self, args: A) -> Self
     where
@@ -592,7 +622,13 @@ impl<S, M, P, R> MessageSpecBuilder<S, M, P, R> {
 }
 
 impl
-    MessageSpecBuilder<state::Selector, state::Mutates, state::IsPayable, state::Returns>
+    MessageSpecBuilder<
+        state::Selector,
+        state::Mutates,
+        state::IsPayable,
+        state::AllowReentrancy,
+        state::Returns,
+    >
 {
     /// Finishes construction of the message.
     pub fn done(self) -> MessageSpec {
@@ -609,6 +645,7 @@ impl IntoPortable for MessageSpec {
             selector: self.selector,
             mutates: self.mutates,
             payable: self.payable,
+            allow_reentrancy: self.allow_reentrancy,
             args: self
                 .args
                 .into_iter()
@@ -817,7 +854,7 @@ impl TypeSpec {
     /// The name is any valid Rust identifier or path.
     ///
     /// # Examples
-    ///
+    /// ''
     /// Valid display names are `foo`, `foo::bar`, `foo::bar::Baz`, etc.
     ///
     /// # Panics

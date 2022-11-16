@@ -64,14 +64,13 @@ where
     Ok(())
 }
 
-
-pub fn deny_reentrance<E>() -> Result<(), DispatchError>
+#[inline]
+pub fn deny_reentrancy<E>() -> Result<(), DispatchError>
 where
     E: Environment,
 {
-    let reentrance = ink_env::reentrant_count();
-    if reentrance > 1 {
-        return Err(DispatchError::ReentranceNotAllowed)
+    if ink_env::reentrant_count::<E>() > 0 {
+        return Err(DispatchError::ReentranceDenied)
     }
     Ok(())
 }

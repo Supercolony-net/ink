@@ -530,4 +530,8 @@ impl TypedEnvBackend for EnvInstance {
     {
         unimplemented!("off-chain environment does not support `own_code_hash`")
     }
+
+    fn reentrant_count<E>(&mut self) -> u32 where E: Environment {
+        unimplemented!("off-chain environment does not support `reentrant_count`")
+    }
 }
